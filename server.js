@@ -1,35 +1,55 @@
 import express from "express";
-import mongoose from "mongoose";
 import session from "express-session";
-import MongoStore from "connect-mongo";
-import authRoute from "./routes/authRoute.js";
-import get_user from "./routes/get_user.js"
+import connectSessionSequelize from "connect-session-sequelize";
+import sequelize from "./config/database.js";
+import authRoutes from "./routes/authRoute.js";
+import getUser from "./routes/getUser.js";
+import dotenv from "dotenv";
+import morgan from "morgan";
+import swaggerUi from "swagger-ui-express";
+import swaggerSpec from "./config/swagger.js";
+
+dotenv.config();
 
 const app = express();
-
+app.use(morgan("dev"));
 app.use(express.json());
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-mongoose.connect("mongodb://localhost:27017/auth_user")
-  .then(() => console.log("MongoDB connected"))
-  .catch(err => console.log(err));
+const SequelizeStore = connectSessionSequelize(session.Store);
+
+const sessionStore = new SequelizeStore({
+  db: sequelize,
+});
 
 app.use(
   session({
-    secret: "secret_key",
+    secret: process.env.SESSION_SECRET,
+    store: sessionStore,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-      mongoUrl: "mongodb://localhost:27017/auth_user"
-    }),
     cookie: {
-      maxAge: 1000 * 60 * 60
-    }
+      maxAge: 60 * 60 * 24,
+    },
   })
 );
 
-app.use("/auth", authRoute);
-app.use("/list", get_user);
+sessionStore.sync();
 
-app.listen(3000, () => {
-  console.log("Started the server");
-});
+app.use("/auth", authRoutes);
+app.use("/list", getUser)
+
+async function start() {
+  try {
+    await sequelize.authenticate();
+    await sequelize.sync({alter:true});
+
+    app.listen(process.env.PORT, () => {
+      console.log(`Server running on port ${process.env.PORT}`);
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+start();
