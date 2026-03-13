@@ -14,7 +14,7 @@ const options = {
       }
     ]
   },
-  apis: ["./routes/*.js"] // files containing API annotations
+  apis: ["./routes/*.js"] 
 };
 
 const swaggerSpec = swaggerJsdoc(options);
